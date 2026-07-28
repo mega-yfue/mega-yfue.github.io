@@ -44,6 +44,13 @@
 #
 # Note: `on:` is parsed before any context exists, so the trigger branch and the cron expression
 # cannot be variables — they are the only two hardcoded values left in this file.
+#
+# ── Actions are pinned to full-length commit SHAs ───────────────────────────────────────────────
+# A tag is mutable: whoever owns the action can move `v7` onto different code, and this workflow
+# would run it without a single character changing here — with a token that reads the private SDK in
+# scope. A SHA is immutable, so an update is a reviewable diff. The trailing `# vX.Y.Z` is the
+# human-readable version and is what Dependabot rewrites alongside the SHA (see dependabot.yml —
+# pinning trades automatic patch pickup for immutability, so that config is what keeps these fresh).
 name: pages
 
 on:
@@ -78,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the SDK (source of the guides and the API reference)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.SDK_REPO }}
           ref: ${{ env.SDK_REF }}
@@ -87,7 +94,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -110,7 +117,7 @@ jobs:
         run: npm run build
 
       - name: Upload the Pages artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: ${{ env.DOCS_DIR }}/.vitepress/dist
 
@@ -123,4 +130,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

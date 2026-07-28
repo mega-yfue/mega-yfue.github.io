@@ -1,0 +1,23 @@
+# Keep the SHA-pinned actions in pages.yml current.
+#
+# Pinning to a commit SHA buys immutability at the cost of automatic patch pickup — a pinned action
+# never picks up a security fix on its own. This config is the other half of that trade: Dependabot
+# opens a PR when an action publishes a new release, rewriting both the SHA and the trailing
+# `# vX.Y.Z` comment. Without it, pinning quietly turns into staleness.
+#
+# There is no npm ecosystem entry here on purpose: this repo has no package.json. The docs site's
+# dependencies live in the SDK repo and are Dependabot's business over there.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Actions here are first-party and move together; one PR keeps the review surface small.
+    groups:
+      actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "ci"
