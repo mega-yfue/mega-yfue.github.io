@@ -1,0 +1,126 @@
+# Build the host-facing eufy SDK docs site and publish it at https://mega-yfue.github.io/
+#
+# This repo holds NO documentation content — only this workflow. The site is generated entirely from
+# the SDK repo's docs folder on every run, so there is nothing here to keep in sync and no copy of
+# the guides, the device imagery, or the generated API reference to drift out of date.
+#
+# What gets published: the docs guide folder ONLY. VitePress' srcDir is that folder, so the build
+# cannot reach the SDK's `docs/` root, which holds internal reverse-engineering and crypto notes.
+# The `guard:docs` step (folded into the SDK's `npm run build`) additionally re-sweeps the TypeDoc-
+# generated API pages for wire/crypto/RE phrases that slipped into a public symbol's JSDoc, and
+# fails the build on a hit. Both guards must stay in place.
+#
+# ── Configuration lives in repository variables, not in this file ───────────────────────────────
+# Settings → Secrets and variables → Actions. Every value below falls back to the post-migration
+# public setup, so the overrides exist only while the SDK is still private:
+#
+#   SDK_REPO      owner/name of the SDK repo          default mega-yfue/eufy-sdk
+#   SDK_REF       branch, tag, or SHA to build from   default main
+#   NODE_VERSION  toolchain for the build             default 24.5.0
+#   DOCS_DIR      docs site folder inside the SDK     default docs/guide
+#   DOCS_BASE     site base path                      default / (a <name>.github.io site is served
+#                                                     from the domain root, not from /<repo>/)
+#
+# ── Migrating to the public SDK repo: delete, don't edit ────────────────────────────────────────
+# The SDK currently lives in a private repo, so the checkout authenticates with SDK_TOKEN — a
+# fine-grained PAT scoped to that one repo with Contents: read, and nothing else. Once the SDK is
+# public, this repo's own GITHUB_TOKEN can read it, so the migration is pure deletion:
+#
+#   1. delete the SDK_REPO and SDK_REF variables  → defaults point at the public repo
+#   2. delete the SDK_TOKEN secret                → checkout falls back to github.token
+#
+# A read-only deploy key would be the better credential here (repo-scoped, no expiry), but the org
+# disables deploy keys, and that toggle governs their USE and not just their creation — a key posted
+# during a brief window goes inert the moment the toggle closes. Re-check that setting before
+# reaching for a deploy key again.
+#
+# SDK_TOKEN expires. When the build starts failing the checkout with a 404 on a repo that plainly
+# exists, an expired or org-unapproved token is the first thing to check.
+#
+# ── Why there is no `pull_request` trigger ──────────────────────────────────────────────────────
+# This is a PUBLIC repo holding a secret that reads a PRIVATE one. A `pull_request` or
+# `pull_request_target` trigger would let untrusted branch content run with that key in scope and
+# exfiltrate the SDK source. Keep the triggers limited to the ones below.
+#
+# Note: `on:` is parsed before any context exists, so the trigger branch and the cron expression
+# cannot be variables — they are the only two hardcoded values left in this file.
+name: pages
+
+on:
+  push:
+    branches: [main]
+  # The SDK repo cannot notify this one without a cross-repo token, so the site refreshes nightly
+  # and on demand. Use "Run workflow" for an immediate publish after an SDK change.
+  schedule:
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+
+env:
+  SDK_REPO: ${{ vars.SDK_REPO || 'mega-yfue/eufy-sdk' }}
+  SDK_REF: ${{ vars.SDK_REF || 'main' }}
+  NODE_VERSION: ${{ vars.NODE_VERSION || '24.5.0' }}
+  DOCS_DIR: ${{ vars.DOCS_DIR || 'docs/guide' }}
+  DOCS_BASE: ${{ vars.DOCS_BASE || '/' }}
+
+# Least privilege plus the tokens the Pages deploy needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One Pages deploy at a time; never cancel an in-flight publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the SDK (source of the guides and the API reference)
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ env.SDK_REPO }}
+          ref: ${{ env.SDK_REF }}
+          # Falls back to this repo's own GITHUB_TOKEN, which is enough for a public SDK checkout.
+          token: ${{ secrets.SDK_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            ${{ env.DOCS_DIR }}/package-lock.json
+
+      # The API reference is generated from the SDK source, so TypeDoc has to resolve the library's
+      # own imports and types. That needs the root dependency tree, not just the docs site's.
+      - name: Install SDK dependencies (for TypeDoc source resolution)
+        run: npm ci
+
+      - name: Install docs site dependencies
+        working-directory: ${{ env.DOCS_DIR }}
+        run: npm ci
+
+      # `npm run build` chains: docs:api (TypeDoc) → guard:docs (leak sweep) → vitepress build.
+      - name: Build the docs site
+        working-directory: ${{ env.DOCS_DIR }}
+        run: npm run build
+
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ env.DOCS_DIR }}/.vitepress/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
