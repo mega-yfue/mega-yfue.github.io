@@ -23,17 +23,18 @@ Settings → Secrets and variables → Actions, each falling back to the public-
 | Variable       | Default              | What it selects                |
 | -------------- | -------------------- | ------------------------------ |
 | `SDK_REPO`     | `mega-yfue/eufy-sdk` | SDK repo to build from         |
-| `SDK_REF`      | `main`               | branch, tag, or SHA            |
+| `SDK_REF`      | `main`               | branch, tag, or SHA — set to the branch carrying the guides |
 | `NODE_VERSION` | `24.5.0`             | build toolchain                |
-| `DOCS_DIR`     | `docs/guide`         | docs site folder inside the SDK |
+| `DOCS_DIR`     | `docs`               | docs site folder inside the SDK |
 | `DOCS_BASE`    | `/`                  | site base path                 |
 
-While the SDK is private, the secret `SDK_TOKEN` holds a fine-grained PAT scoped to that repo alone
-with *Contents: read*. Migrating to the public SDK repo is a matter of deleting the overriding
-variables and that secret — the defaults take over and the checkout falls back to this repo's own
-`GITHUB_TOKEN`. See the comments at the top of the workflow.
+While the SDK is private, the secret `SDK_TOKEN` holds a fine-grained PAT with *Contents: read* on
+`mega-yfue/eufy-sdk` and nothing else. Migrating to the public SDK repo is a matter of deleting the
+overriding variables and that secret — the defaults take over and the checkout falls back to this
+repo's own `GITHUB_TOKEN`. See the comments at the top of the workflow.
 
-`SDK_TOKEN` expires. A checkout failing with a 404 on a repo that plainly exists is the symptom.
+`SDK_TOKEN` expires, and a token scoped to the wrong repository never worked in the first place. Both
+show up the same way: the checkout fails on a repo that plainly exists — a 404, or exit 128.
 
 ## What the build actually does
 

@@ -17,17 +17,23 @@
 #   SDK_REPO      owner/name of the SDK repo          default mega-yfue/eufy-sdk
 #   SDK_REF       branch, tag, or SHA to build from   default main
 #   NODE_VERSION  toolchain for the build             default 24.5.0
-#   DOCS_DIR      docs site folder inside the SDK     default docs/guide
+#   DOCS_DIR      docs site folder inside the SDK     default docs
 #   DOCS_BASE     site base path                      default / (a <name>.github.io site is served
 #                                                     from the domain root, not from /<repo>/)
 #
-# ── Migrating to the public SDK repo: delete, don't edit ────────────────────────────────────────
-# The SDK currently lives in a private repo, so the checkout authenticates with SDK_TOKEN — a
-# fine-grained PAT scoped to that one repo with Contents: read, and nothing else. Once the SDK is
-# public, this repo's own GITHUB_TOKEN can read it, so the migration is pure deletion:
+# ── The SDK repo is private: SDK_TOKEN must be scoped to IT ─────────────────────────────────────
+# The checkout authenticates with SDK_TOKEN — a fine-grained PAT with Contents: read on
+# mega-yfue/eufy-sdk and nothing else. A token scoped to a different repository fails the checkout
+# with exit 128, which reads as a git error rather than a permissions one.
 #
-#   1. delete the SDK_REPO and SDK_REF variables  → defaults point at the public repo
-#   2. delete the SDK_TOKEN secret                → checkout falls back to github.token
+# While the library is being assembled the guides live on a working branch, not on the default one, so
+# SDK_REF has to name that branch (`beta-0.1.0`) — pointing at `main` builds the scaffold's single
+# placeholder page instead of the sixteen guides.
+#
+# Once the SDK is public and its guides are on the default branch, the migration is pure deletion:
+#
+#   1. delete the SDK_REF variable   → default `main`
+#   2. delete the SDK_TOKEN secret   → checkout falls back to github.token
 #
 # A read-only deploy key would be the better credential here (repo-scoped, no expiry), but the org
 # disables deploy keys, and that toggle governs their USE and not just their creation — a key posted
@@ -66,7 +72,7 @@ env:
   SDK_REPO: ${{ vars.SDK_REPO || 'mega-yfue/eufy-sdk' }}
   SDK_REF: ${{ vars.SDK_REF || 'main' }}
   NODE_VERSION: ${{ vars.NODE_VERSION || '24.5.0' }}
-  DOCS_DIR: ${{ vars.DOCS_DIR || 'docs/guide' }}
+  DOCS_DIR: ${{ vars.DOCS_DIR || 'docs' }}
   DOCS_BASE: ${{ vars.DOCS_BASE || '/' }}
 
 # Least privilege plus the tokens the Pages deploy needs.
