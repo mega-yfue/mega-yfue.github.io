@@ -10,31 +10,16 @@
 # generated API pages for wire/crypto/RE phrases that slipped into a public symbol's JSDoc, and
 # fails the build on a hit. Both guards must stay in place.
 #
-# ── Configuration lives in repository variables, not in this file ───────────────────────────────
-# Settings → Secrets and variables → Actions. Each falls back to the value below, and the defaults
-# are what the site runs on:
+# The SDK is public, so the checkout uses this repo's own GITHUB_TOKEN and there is no credential here
+# to scope, rotate, or expire.
 #
-#   SDK_REPO      owner/name of the SDK repo          default mega-yfue/eufy-sdk
-#   SDK_REF       branch, tag, or SHA to build from   default main
-#   NODE_VERSION  toolchain for the build             default 24.5.0
-#   DOCS_DIR      docs site folder inside the SDK     default docs
-#   DOCS_BASE     site base path                      default / (a <name>.github.io site is served
-#                                                     from the domain root, not from /<repo>/)
-#
-# `SDK_REF` is the one worth setting deliberately: pointing it at a working branch publishes that
-# branch's guides, which is how a docs change is previewed live before it reaches the SDK's default
-# branch. Whatever it names is what the public site serves, so it belongs back on `main` afterwards.
-#
-# The SDK is public, so the checkout authenticates with this repo's own GITHUB_TOKEN and there is no
-# credential here to scope, rotate, or expire.
+# The site base is left to the SDK's VitePress config, which defaults to `/` — a `<name>.github.io`
+# site is served from the domain root, not from `/<repo>/`.
 #
 # ── Why there is no `pull_request` trigger ──────────────────────────────────────────────────────
 # Every page comes from another repository, so a pull request here has no content to validate — and
 # the job carries `pages: write`, which publishes the live site. Keep the triggers limited to the
 # ones below.
-#
-# Note: `on:` is parsed before any context exists, so the trigger branch and the cron expression
-# cannot be variables — they are the only two hardcoded values left in this file.
 #
 # ── Actions are pinned to full-length commit SHAs ───────────────────────────────────────────────
 # A tag is mutable: whoever owns the action can move `v7` onto different code, and this workflow
@@ -52,13 +37,6 @@ on:
   schedule:
     - cron: "41 4 * * *"
   workflow_dispatch:
-
-env:
-  SDK_REPO: ${{ vars.SDK_REPO || 'mega-yfue/eufy-sdk' }}
-  SDK_REF: ${{ vars.SDK_REF || 'main' }}
-  NODE_VERSION: ${{ vars.NODE_VERSION || '24.5.0' }}
-  DOCS_DIR: ${{ vars.DOCS_DIR || 'docs' }}
-  DOCS_BASE: ${{ vars.DOCS_BASE || '/' }}
 
 # Least privilege plus the tokens the Pages deploy needs.
 permissions:
@@ -78,18 +56,18 @@ jobs:
       - name: Check out the SDK (source of the guides and the API reference)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ env.SDK_REPO }}
-          ref: ${{ env.SDK_REF }}
+          repository: mega-yfue/eufy-sdk
+          ref: main
           persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: 24.5.0
           cache: npm
           cache-dependency-path: |
             package-lock.json
-            ${{ env.DOCS_DIR }}/package-lock.json
+            docs/package-lock.json
 
       # The API reference is generated from the SDK source, so TypeDoc has to resolve the library's
       # own imports and types. That needs the root dependency tree, not just the docs site's.
@@ -97,18 +75,18 @@ jobs:
         run: npm ci
 
       - name: Install docs site dependencies
-        working-directory: ${{ env.DOCS_DIR }}
+        working-directory: docs
         run: npm ci
 
       # `npm run build` chains: docs:api (TypeDoc) → guard:docs (leak sweep) → vitepress build.
       - name: Build the docs site
-        working-directory: ${{ env.DOCS_DIR }}
+        working-directory: docs
         run: npm run build
 
       - name: Upload the Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: ${{ env.DOCS_DIR }}/.vitepress/dist
+          path: docs/.vitepress/dist
 
   deploy:
     needs: build
