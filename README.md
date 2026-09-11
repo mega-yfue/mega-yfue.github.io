@@ -18,23 +18,22 @@ The SDK repo cannot notify this one without a cross-repo token, so the site rebu
 
 Nothing is hardcoded except the trigger branch and the cron expression, which GitHub evaluates
 before any context exists. Everything else is a repository variable under
-Settings → Secrets and variables → Actions, each falling back to the public-SDK setup:
+Settings → Secrets and variables → Actions, each falling back to the value the site runs on:
 
-| Variable       | Default              | What it selects                |
-| -------------- | -------------------- | ------------------------------ |
-| `SDK_REPO`     | `mega-yfue/eufy-sdk` | SDK repo to build from         |
-| `SDK_REF`      | `main`               | branch, tag, or SHA — set to the branch carrying the guides |
-| `NODE_VERSION` | `24.5.0`             | build toolchain                |
+| Variable       | Default              | What it selects                 |
+| -------------- | -------------------- | ------------------------------- |
+| `SDK_REPO`     | `mega-yfue/eufy-sdk` | SDK repo to build from          |
+| `SDK_REF`      | `main`               | branch, tag, or SHA             |
+| `NODE_VERSION` | `24.5.0`             | build toolchain                 |
 | `DOCS_DIR`     | `docs`               | docs site folder inside the SDK |
-| `DOCS_BASE`    | `/`                  | site base path                 |
+| `DOCS_BASE`    | `/`                  | site base path                  |
 
-While the SDK is private, the secret `SDK_TOKEN` holds a fine-grained PAT with *Contents: read* on
-`mega-yfue/eufy-sdk` and nothing else. Migrating to the public SDK repo is a matter of deleting the
-overriding variables and that secret — the defaults take over and the checkout falls back to this
-repo's own `GITHUB_TOKEN`. See the comments at the top of the workflow.
+`SDK_REF` is the one worth setting deliberately: pointing it at a working branch publishes that
+branch's guides, which is how a docs change is seen live before it reaches the SDK's default branch.
+Whatever it names is what the public site serves, so it belongs back on `main` afterwards.
 
-`SDK_TOKEN` expires, and a token scoped to the wrong repository never worked in the first place. Both
-show up the same way: the checkout fails on a repo that plainly exists — a 404, or exit 128.
+The SDK is public, so the checkout uses this repo's own `GITHUB_TOKEN`. There is no credential here to
+scope, rotate, or expire.
 
 ## What the build actually does
 

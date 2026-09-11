@@ -11,8 +11,8 @@
 # fails the build on a hit. Both guards must stay in place.
 #
 # ── Configuration lives in repository variables, not in this file ───────────────────────────────
-# Settings → Secrets and variables → Actions. Every value below falls back to the post-migration
-# public setup, so the overrides exist only while the SDK is still private:
+# Settings → Secrets and variables → Actions. Each falls back to the value below, and the defaults
+# are what the site runs on:
 #
 #   SDK_REPO      owner/name of the SDK repo          default mega-yfue/eufy-sdk
 #   SDK_REF       branch, tag, or SHA to build from   default main
@@ -21,42 +21,27 @@
 #   DOCS_BASE     site base path                      default / (a <name>.github.io site is served
 #                                                     from the domain root, not from /<repo>/)
 #
-# ── The SDK repo is private: SDK_TOKEN must be scoped to IT ─────────────────────────────────────
-# The checkout authenticates with SDK_TOKEN — a fine-grained PAT with Contents: read on
-# mega-yfue/eufy-sdk and nothing else. A token scoped to a different repository fails the checkout
-# with exit 128, which reads as a git error rather than a permissions one.
+# `SDK_REF` is the one worth setting deliberately: pointing it at a working branch publishes that
+# branch's guides, which is how a docs change is previewed live before it reaches the SDK's default
+# branch. Whatever it names is what the public site serves, so it belongs back on `main` afterwards.
 #
-# While the library is being assembled the guides live on a working branch, not on the default one, so
-# SDK_REF has to name that branch (`beta-0.1.0`) — pointing at `main` builds the scaffold's single
-# placeholder page instead of the sixteen guides.
-#
-# Once the SDK is public and its guides are on the default branch, the migration is pure deletion:
-#
-#   1. delete the SDK_REF variable   → default `main`
-#   2. delete the SDK_TOKEN secret   → checkout falls back to github.token
-#
-# A read-only deploy key would be the better credential here (repo-scoped, no expiry), but the org
-# disables deploy keys, and that toggle governs their USE and not just their creation — a key posted
-# during a brief window goes inert the moment the toggle closes. Re-check that setting before
-# reaching for a deploy key again.
-#
-# SDK_TOKEN expires. When the build starts failing the checkout with a 404 on a repo that plainly
-# exists, an expired or org-unapproved token is the first thing to check.
+# The SDK is public, so the checkout authenticates with this repo's own GITHUB_TOKEN and there is no
+# credential here to scope, rotate, or expire.
 #
 # ── Why there is no `pull_request` trigger ──────────────────────────────────────────────────────
-# This is a PUBLIC repo holding a secret that reads a PRIVATE one. A `pull_request` or
-# `pull_request_target` trigger would let untrusted branch content run with that key in scope and
-# exfiltrate the SDK source. Keep the triggers limited to the ones below.
+# Every page comes from another repository, so a pull request here has no content to validate — and
+# the job carries `pages: write`, which publishes the live site. Keep the triggers limited to the
+# ones below.
 #
 # Note: `on:` is parsed before any context exists, so the trigger branch and the cron expression
 # cannot be variables — they are the only two hardcoded values left in this file.
 #
 # ── Actions are pinned to full-length commit SHAs ───────────────────────────────────────────────
 # A tag is mutable: whoever owns the action can move `v7` onto different code, and this workflow
-# would run it without a single character changing here — with a token that reads the private SDK in
-# scope. A SHA is immutable, so an update is a reviewable diff. The trailing `# vX.Y.Z` is the
-# human-readable version and is what Dependabot rewrites alongside the SHA (see dependabot.yml —
-# pinning trades automatic patch pickup for immutability, so that config is what keeps these fresh).
+# would run it without a single character changing here. A SHA is immutable, so an update is a
+# reviewable diff. The trailing `# vX.Y.Z` is the human-readable version and is what Dependabot
+# rewrites alongside the SHA (see dependabot.yml — pinning trades automatic patch pickup for
+# immutability, so that config is what keeps these fresh).
 name: pages
 
 on:
@@ -95,8 +80,6 @@ jobs:
         with:
           repository: ${{ env.SDK_REPO }}
           ref: ${{ env.SDK_REF }}
-          # Falls back to this repo's own GITHUB_TOKEN, which is enough for a public SDK checkout.
-          token: ${{ secrets.SDK_TOKEN || github.token }}
           persist-credentials: false
 
       - name: Set up Node.js
